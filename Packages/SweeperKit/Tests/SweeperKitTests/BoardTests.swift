@@ -31,6 +31,18 @@ struct BoardTests {
         let d = Difficulty.custom(width: 500, height: 2, mines: 10_000)
         #expect(d.width == Difficulty.sizeRange.upperBound)
         #expect(d.height == 8)
-        #expect(d.mines == d.width * 8 - 9)
+        #expect(d.mines == d.width * 8 / 2, "Capped at half the cells")
+    }
+
+    @Test func mineCapIsHalfTheCells() {
+        #expect(Difficulty.maxMines(width: 20, height: 20) == 200)
+        #expect(Difficulty.maxMines(width: 9, height: 3) == 13)
+        // Every preset sits well under the cap.
+        for shape in Difficulty.Shape.allCases {
+            for size in Difficulty.Size.allCases {
+                let hard = Difficulty(shape: shape, size: size, level: .hard)
+                #expect(hard.mines <= Difficulty.maxMines(width: hard.width, height: hard.height))
+            }
+        }
     }
 }

@@ -21,7 +21,7 @@ struct CustomDifficultyScreen: View {
                 Stepper("Height: \(height)", value: $height, in: Difficulty.customSizeRange)
                 Stepper("Mines: \(mines)", value: $mines, in: 1...maxMines)
             } footer: {
-                Text("\(Double(mines) / Double(width * height), format: .percent.precision(.fractionLength(0))) of cells are mines.")
+                Text("\(Double(mines) / Double(width * height), format: .percent.precision(.fractionLength(0))) of cells are mines (up to \(Difficulty.maxDensity, format: .percent)).")
             }
         }
         .navigationTitle("Custom Board")
