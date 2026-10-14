@@ -24,7 +24,7 @@ struct CustomDifficultyScreen: View {
                 Stepper("Height: \(height)", value: $height, in: Difficulty.customSizeRange)
                 minesControl
             } footer: {
-                Text("\(Double(mines) / Double(width * height), format: .percent.precision(.fractionLength(0))) of cells are mines (up to \(Difficulty.maxDensity, format: .percent)).")
+                Text("\(Double(mines) / Double(width * height), format: .percent.precision(.fractionLength(0))) of cells are mines. Up to \(String(maxMines)) (\(Difficulty.maxDensity, format: .percent)).")
             }
         }
         .navigationTitle("Custom Board")
@@ -57,38 +57,19 @@ struct CustomDifficultyScreen: View {
         }
     }
 
-    /// A slider for big moves and a number field for exact counts, kept in sync.
+    /// A number field for the mine count, clamped to the allowed range as you type.
     private var minesControl: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("Mines")
-                Spacer()
-                TextField("Mines", text: $minesText)
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.trailing)
-                    .monospacedDigit()
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 90)
-                    .focused($isEditingMines)
-            }
-            Slider(
-                value: Binding(
-                    get: { Double(mines) },
-                    set: { setMines(Int($0.rounded())) }
-                ),
-                in: 1...Double(maxMines),
-                step: 1
-            ) {
-                Text("Mines")
-            } minimumValueLabel: {
-                Text("1")
-            } maximumValueLabel: {
-                // Plain digits, to match the field (interpolating an Int adds a grouping comma).
-                Text(verbatim: String(maxMines))
-            }
-            .monospacedDigit()
+        HStack {
+            Text("Mines")
+            Spacer()
+            TextField("Mines", text: $minesText)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+                .monospacedDigit()
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 90)
+                .focused($isEditingMines)
         }
-        .padding(.vertical, 4)
     }
 
     private func setMines(_ count: Int) {
