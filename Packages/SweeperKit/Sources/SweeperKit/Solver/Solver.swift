@@ -24,6 +24,9 @@ struct Deductions {
 public enum NoGuessLogic: String, CaseIterable, Codable, Sendable {
     /// Single numbers and overlapping pairs only (1-2-1, 1-1 against a wall, …). No mine counting.
     case easy
+    /// Easy plus the mine counter: when one number holds all the mines left, or the rest of the
+    /// board is needed to reach the count.
+    case medium
     /// Anything that follows from the numbers and the mine count.
     case hard
 }
@@ -39,7 +42,8 @@ public enum NoGuessLogic: String, CaseIterable, Codable, Sendable {
 ///    backtracking (state kept in 64-bit masks), then regions are combined with the total
 ///    mine count to decide cells, including unseen interior cells in the endgame.
 ///
-/// `NoGuessLogic.easy` stops after level 2.
+/// `NoGuessLogic.easy` stops after level 2. `.medium` swaps level 3 for **counting**: what the
+/// mines left say on their own, the way a player reads the counter (see `counting`).
 enum Solver {
     struct Constraint {
         /// Unknown neighbours, ascending.
@@ -66,8 +70,12 @@ enum Solver {
         let singles = singles(constraints)
         if !singles.isEmpty { return singles }
         let pairs = pairs(constraints)
-        if !pairs.isEmpty || logic == .easy { return pairs }
-        return regions(knowledge, grid: grid, constraints: constraints)
+        if !pairs.isEmpty { return pairs }
+        switch logic {
+        case .easy: return pairs
+        case .medium: return counting(knowledge, constraints: constraints)
+        case .hard: return regions(knowledge, grid: grid, constraints: constraints)
+        }
     }
 
     static func deduce(_ knowledge: Knowledge, grid: Grid, logic: NoGuessLogic = .hard) -> Deductions {
@@ -131,6 +139,37 @@ enum Solver {
                     result.mines.formUnion(onlyB)
                     result.safe.formUnion(onlyA)
                 }
+            }
+        }
+        return result
+    }
+
+    // MARK: - Counting
+
+    /// What the mine counter gives without trying arrangements: every unknown cell together holds
+    /// exactly the mines left. That group is checked like a single number (all safe / all mines)
+    /// and like a pair with every number, e.g. a corner ringed by 1s that could hold one mine or
+    /// two is settled once everything else is clear and the counter says one is left.
+    ///
+    /// Counting only the whole board, rather than the board minus some chosen numbers, keeps
+    /// this order-independent: whatever order a player clears in, it stays available.
+    static func counting(_ knowledge: Knowledge, constraints: [Constraint]) -> Deductions {
+        let unknown = Set(knowledge.cells.indices.filter { knowledge.cells[$0] == Knowledge.unknown })
+        let remaining = knowledge.totalMines - knowledge.cells.count { $0 == Knowledge.mine }
+        guard !unknown.isEmpty, (0...unknown.count).contains(remaining) else { return Deductions() }
+
+        var result = Deductions()
+        if remaining == 0 { result.safe = unknown }
+        if remaining == unknown.count { result.mines = unknown }
+        // Every number's unknown cells lie inside `unknown`, so the pair rule from `pairs` reads:
+        for constraint in constraints {
+            let outside = unknown.count - constraint.cells.count
+            if constraint.mines == remaining {
+                // This number holds every mine left; nothing else can be one.
+                result.safe.formUnion(unknown.subtracting(constraint.cells))
+            } else if remaining - constraint.mines == outside {
+                // Every cell this number doesn't touch is needed to reach the count.
+                result.mines.formUnion(unknown.subtracting(constraint.cells))
             }
         }
         return result

@@ -51,6 +51,19 @@ struct SolverTests {
         #expect(Solver.deduce(k, grid: grid).safe.contains(2))
     }
 
+    @Test func mediumCountsMinesWhereEasyCannot() {
+        // ? 1 ? ?   → the 1 holds the only mine, so the far cell is safe.
+        let (k, grid) = knowledge(["?1??"], mines: 1)
+        #expect(Solver.deduce(k, grid: grid, logic: .easy).isEmpty)
+        #expect(Solver.deduce(k, grid: grid, logic: .medium).safe == [3])
+    }
+
+    @Test func mediumFillsTheRestWhenTheCountNeedsIt() {
+        // ? 1 ? ?   with two mines: one must be outside the 1, and only the far cell is.
+        let (k, grid) = knowledge(["?1??"], mines: 2)
+        #expect(Solver.deduce(k, grid: grid, logic: .medium).mines == [3])
+    }
+
     @Test func fiftyFiftyIsNotGuessed() {
         let (k, grid) = knowledge(["??", "11"], mines: 1)
         #expect(Solver.deduce(k, grid: grid).isEmpty)

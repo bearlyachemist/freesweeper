@@ -173,7 +173,7 @@ struct GameSessionTests {
 
     @Test(arguments: NoGuessLogic.allCases)
     func noGuessFirstTapBuildsASolvableBoard(logic: NoGuessLogic) async {
-        let h = Harness { $0.noGuessing = logic == .easy ? .easy : .hard }
+        let h = Harness { $0.noGuessing = NoGuessing(rawValue: logic.rawValue)! }
         let start = Coord(x: 6, y: 6)
         h.session.tap(start)
         #expect(h.session.isGenerating)

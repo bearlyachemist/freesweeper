@@ -25,7 +25,7 @@ enum Appearance: String, CaseIterable, Identifiable {
 
 /// The No Guessing switch: off, or how much logic a board may ask for.
 enum NoGuessing: String, CaseIterable, Identifiable {
-    case off, easy, hard
+    case off, easy, medium, hard
 
     var id: Self { self }
 
@@ -33,6 +33,7 @@ enum NoGuessing: String, CaseIterable, Identifiable {
         switch self {
         case .off: nil
         case .easy: .easy
+        case .medium: .medium
         case .hard: .hard
         }
     }
@@ -44,6 +45,7 @@ enum NoGuessing: String, CaseIterable, Identifiable {
         switch self {
         case .off: "Ordinary random boards. Sometimes you'll have to guess."
         case .easy: "Every board can be cleared with single numbers and simple patterns like 1-2-1. You never need the mine count."
+        case .medium: "Easy, plus the mine counter: sometimes the mines left settle the last few cells."
         case .hard: "Every board can be cleared by logic, but it may take longer chains of reasoning or the mine count near the end."
         }
     }

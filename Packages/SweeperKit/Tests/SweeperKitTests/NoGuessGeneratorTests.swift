@@ -19,13 +19,13 @@ struct NoGuessGeneratorTests {
         }
     }
 
-    @Test(arguments: presets)
-    func easyBoardsNeedOnlySimplePatterns(difficulty: Difficulty) throws {
+    @Test(arguments: presets, [NoGuessLogic.easy, .medium])
+    func simplerLogicBoardsAreSolvableWithIt(difficulty: Difficulty, logic: NoGuessLogic) throws {
         for seed in UInt64(0)..<5 {
             let start = Coord(x: Int(seed) % difficulty.width, y: Int(seed * 7) % difficulty.height)
-            let board = try #require(NoGuessGenerator.generate(difficulty, seed: seed, safe: start, logic: .easy))
+            let board = try #require(NoGuessGenerator.generate(difficulty, seed: seed, safe: start, logic: logic))
             #expect(board.mineCount == difficulty.mines)
-            #expect(NoGuessGenerator.isSolvable(board, from: start, logic: .easy))
+            #expect(NoGuessGenerator.isSolvable(board, from: start, logic: logic))
         }
     }
 

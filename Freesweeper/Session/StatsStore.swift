@@ -21,6 +21,7 @@ struct StatsMode: Hashable, Codable {
         let suffix = switch noGuessing {
         case nil: ""
         case .easy: "-noguess-easy"
+        case .medium: "-noguess-medium"
         case .hard: "-noguess"
         }
         return "\(width)x\(height)x\(mines)" + suffix

@@ -36,6 +36,7 @@ extension NoGuessLogic {
     var displayName: String {
         switch self {
         case .easy: "Easy"
+        case .medium: "Medium"
         case .hard: "Hard"
         }
     }
