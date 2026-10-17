@@ -8,13 +8,14 @@ public enum NoGuessGenerator {
     /// Fresh random layouts to try before giving up.
     static let attempts = 8
 
-    /// A no-guess board for a first tap at `start`, or `nil` if none was found in time (only at
-    /// extreme densities), the time limit passed, or the calling task was cancelled.
-    /// Deterministic for a given difficulty, seed and start when it finishes.
+    /// A no-guess board for a first tap at `start` that `logic` can clear, or `nil` if none was
+    /// found in time (only at extreme densities), the time limit passed, or the calling task was
+    /// cancelled. Deterministic for a given difficulty, seed, start and logic when it finishes.
     public static func generate(
         _ difficulty: Difficulty,
         seed: UInt64,
         safe start: Coord,
+        logic: NoGuessLogic = .hard,
         timeLimit: Duration? = nil
     ) -> Board? {
         let grid = Grid(width: difficulty.width, height: difficulty.height)
@@ -27,14 +28,14 @@ public enum NoGuessGenerator {
 
         for _ in 0..<attempts {
             let layout = BoardGenerator.random(difficulty, seed: rng.next(), safe: start)
-            var play = Playthrough(grid: grid, mines: layout.cells.map(\.isMine), start: startIndex)
+            var play = Playthrough(grid: grid, mines: layout.cells.map(\.isMine), start: startIndex, logic: logic)
             // Whatever the random layout kept clear around the first tap stays clear.
             let protected = Set([startIndex] + grid.neighbors[startIndex].filter { !play.mines[$0] })
 
             for _ in 0..<maxMoves {
                 if shouldStop() { return nil }
                 if play.run(shouldStop: shouldStop) {
-                    var replay = Playthrough(grid: grid, mines: play.mines, start: startIndex)
+                    var replay = Playthrough(grid: grid, mines: play.mines, start: startIndex, logic: logic)
                     if replay.run(shouldStop: shouldStop) { return board(grid, mines: replay.mines) }
                     play = replay
                 }
@@ -45,11 +46,11 @@ public enum NoGuessGenerator {
         return nil
     }
 
-    /// Whether a perfect logical player can clear `board` from a first tap at `start`.
-    public static func isSolvable(_ board: Board, from start: Coord) -> Bool {
+    /// Whether a player using `logic` can clear `board` from a first tap at `start` without guessing.
+    public static func isSolvable(_ board: Board, from start: Coord, logic: NoGuessLogic = .hard) -> Bool {
         let grid = Grid(width: board.width, height: board.height)
         guard board.contains(start), !board[start].isMine else { return false }
-        var play = Playthrough(grid: grid, mines: board.cells.map(\.isMine), start: board.index(of: start))
+        var play = Playthrough(grid: grid, mines: board.cells.map(\.isMine), start: board.index(of: start), logic: logic)
         return play.run()
     }
 
@@ -91,7 +92,7 @@ public enum NoGuessGenerator {
         var mines = play.mines
         mines[from] = false
         mines[destinations[rng.int(below: destinations.count)]] = true
-        play = Playthrough(grid: play.grid, mines: mines, start: play.start)
+        play = Playthrough(grid: play.grid, mines: mines, start: play.start, logic: play.logic)
         return true
     }
 

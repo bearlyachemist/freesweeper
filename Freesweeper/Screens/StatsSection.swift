@@ -26,7 +26,11 @@ struct StatsSection: View {
             Button("Reset Stats for This Mode", role: .destructive) { isConfirmingReset = true }
                 .disabled(mode.played == 0)
         } header: {
-            Text("Stats · \(self.mode.name)")
+            // No Guessing gets its own line rather than wrapping mid-name.
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Stats · \(self.mode.boardName)")
+                if let noGuessing = self.mode.noGuessingName { Text(noGuessing) }
+            }
         }
         .confirmationDialog(
             "Reset stats for \(self.mode.name)?",

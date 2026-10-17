@@ -163,22 +163,25 @@ struct GameSessionTests {
     // MARK: No Guessing
 
     @Test func modeFollowsTheSwitchUntilTheFirstDig() {
-        let h = Harness { $0.noGuessing = true }
-        #expect(h.session.statsMode.noGuessing)
-        h.settings.noGuessing = false
-        #expect(!h.session.statsMode.noGuessing)
+        let h = Harness { $0.noGuessing = .hard }
+        #expect(h.session.statsMode.noGuessing == .hard)
+        h.settings.noGuessing = .easy
+        #expect(h.session.statsMode.noGuessing == .easy)
+        h.settings.noGuessing = .off
+        #expect(h.session.statsMode.noGuessing == nil)
     }
 
-    @Test func noGuessFirstTapBuildsASolvableBoard() async {
-        let h = Harness { $0.noGuessing = true }
+    @Test(arguments: NoGuessLogic.allCases)
+    func noGuessFirstTapBuildsASolvableBoard(logic: NoGuessLogic) async {
+        let h = Harness { $0.noGuessing = logic == .easy ? .easy : .hard }
         let start = Coord(x: 6, y: 6)
         h.session.tap(start)
         #expect(h.session.isGenerating)
         #expect(await eventually { !h.session.isGenerating })
-        #expect(h.session.isNoGuessBoard)
-        #expect(h.session.statsMode.noGuessing)
+        #expect(h.session.noGuessLogic == logic)
+        #expect(h.session.statsMode.noGuessing == logic)
         #expect(h.session.game.board[start].state == .revealed)
-        #expect(NoGuessGenerator.isSolvable(h.session.game.board, from: start))
+        #expect(NoGuessGenerator.isSolvable(h.session.game.board, from: start, logic: logic))
     }
 
     @Test func inputIsIgnoredWhileGenerating() {
@@ -222,7 +225,7 @@ struct GameSessionTests {
     /// 64×64 at ~45% mines: No Guessing can't succeed, so it runs until stopped.
     private func denseNoGuessHarness(limit: Duration) -> Harness {
         Harness(noGuessTimeLimit: limit) {
-            $0.noGuessing = true
+            $0.noGuessing = .hard
             $0.difficulty = .custom(width: 64, height: 64, mines: 1_850)
         }
     }

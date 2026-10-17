@@ -25,8 +25,8 @@ final class GameSession {
     private(set) var flagChanges = 0
     /// A no-guess board is being built after the first tap; the board ignores input meanwhile.
     private(set) var isGenerating = false
-    /// Whether the current board's mines came from the no-guess generator.
-    private(set) var isNoGuessBoard: Bool
+    /// The logic the no-guess generator built the current board for, or `nil` if it didn't.
+    private(set) var noGuessLogic: NoGuessLogic?
     /// Called with the recorded result when a game is won or lost.
     @ObservationIgnored var onFinish: (@MainActor (GameResult) -> Void)?
     /// Called when No Guessing couldn't build the board in time; nothing was dug.
@@ -59,11 +59,11 @@ final class GameSession {
         if let saved = SavedGame.load(from: defaults) {
             game = saved.game
             clock = GameClock(elapsed: .seconds(saved.elapsedSeconds))
-            isNoGuessBoard = saved.isNoGuessBoard
+            noGuessLogic = saved.noGuessLogic
         } else {
             game = Game(difficulty: settings.difficulty, seed: .random(in: .min ... .max))
             clock = GameClock()
-            isNoGuessBoard = false
+            noGuessLogic = nil
         }
     }
 
@@ -89,7 +89,7 @@ final class GameSession {
     /// The mode of the board being played. Before the first dig the No Guessing switch decides;
     /// after, what the board actually is.
     var statsMode: StatsMode {
-        StatsMode(difficulty: game.difficulty, noGuessing: game.needsMines ? settings.noGuessing : isNoGuessBoard)
+        StatsMode(difficulty: game.difficulty, noGuessing: game.needsMines ? settings.noGuessing.logic : noGuessLogic)
     }
 
     // MARK: - Actions
@@ -106,7 +106,7 @@ final class GameSession {
         clock.reset()
         pressedCells = []
         gameID += 1
-        isNoGuessBoard = false
+        noGuessLogic = nil
         SavedGame.clear(from: defaults)
         updateTicking()
     }
@@ -149,7 +149,7 @@ final class GameSession {
 
     private func persist() {
         if game.status == .playing {
-            SavedGame(game: game, elapsedSeconds: clock.elapsed().seconds, isNoGuessBoard: isNoGuessBoard)
+            SavedGame(game: game, elapsedSeconds: clock.elapsed().seconds, noGuessLogic: noGuessLogic)
                 .save(to: defaults)
         } else {
             SavedGame.clear(from: defaults)
@@ -157,8 +157,8 @@ final class GameSession {
     }
 
     private func dig(_ coord: Coord) {
-        if game.needsMines, settings.noGuessing, game.board[coord].state == .hidden {
-            startNoGuessGame(at: coord)
+        if game.needsMines, let logic = settings.noGuessing.logic, game.board[coord].state == .hidden {
+            startNoGuessGame(at: coord, logic: logic)
         } else {
             update { $0.reveal(coord) }
         }
@@ -166,7 +166,7 @@ final class GameSession {
 
     /// Builds a no-guess board around the first tap off the main thread, then digs there.
     /// If none is found within the time limit, nothing is dug and the player is told.
-    private func startNoGuessGame(at coord: Coord) {
+    private func startNoGuessGame(at coord: Coord, logic: NoGuessLogic) {
         isGenerating = true
         pressedCells = []
         let id = gameID
@@ -174,7 +174,7 @@ final class GameSession {
         let seed = game.seed
         let timeLimit = noGuessTimeLimit
         let worker = Task.detached(priority: .userInitiated) {
-            NoGuessGenerator.generate(difficulty, seed: seed, safe: coord, timeLimit: timeLimit)
+            NoGuessGenerator.generate(difficulty, seed: seed, safe: coord, logic: logic, timeLimit: timeLimit)
         }
         generation = worker
         Task {
@@ -186,7 +186,7 @@ final class GameSession {
                 onNoGuessUnavailable?()
                 return
             }
-            isNoGuessBoard = true
+            noGuessLogic = logic
             game.placeMines(layout)
             update { $0.reveal(coord) }
         }

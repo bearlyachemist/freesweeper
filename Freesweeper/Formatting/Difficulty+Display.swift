@@ -32,6 +32,15 @@ extension Difficulty.Size {
     }
 }
 
+extension NoGuessLogic {
+    var displayName: String {
+        switch self {
+        case .easy: "Easy"
+        case .hard: "Hard"
+        }
+    }
+}
+
 extension Difficulty.Level {
     var displayName: String {
         switch self {

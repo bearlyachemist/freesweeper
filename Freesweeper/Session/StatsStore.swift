@@ -1,25 +1,40 @@
 import Foundation
 import SweeperKit
 
-/// A mode for stats: board size, mine count and whether it was a no-guess board.
+/// A mode for stats: board size, mine count and the logic a no-guess board was built for.
 struct StatsMode: Hashable, Codable {
     let width: Int
     let height: Int
     let mines: Int
-    let noGuessing: Bool
+    /// `nil` for an ordinary random board.
+    let noGuessing: NoGuessLogic?
 
-    init(difficulty: Difficulty, noGuessing: Bool) {
+    init(difficulty: Difficulty, noGuessing: NoGuessLogic?) {
         width = difficulty.width
         height = difficulty.height
         mines = difficulty.mines
         self.noGuessing = noGuessing
     }
 
-    var key: String { "\(width)x\(height)x\(mines)" + (noGuessing ? "-noguess" : "") }
+    /// Hard keeps the key No Guessing had before Easy existed, so those stats carry over.
+    var key: String {
+        let suffix = switch noGuessing {
+        case nil: ""
+        case .easy: "-noguess-easy"
+        case .hard: "-noguess"
+        }
+        return "\(width)x\(height)x\(mines)" + suffix
+    }
 
     var name: String {
-        Difficulty(width: width, height: height, mines: mines).modeName + (noGuessing ? " · No Guessing" : "")
+        [boardName, noGuessingName].compactMap(\.self).joined(separator: " · ")
     }
+
+    /// The board part of `name`, e.g. "Small Square · Easy".
+    var boardName: String { Difficulty(width: width, height: height, mines: mines).modeName }
+
+    /// The No Guessing part of `name`, if any.
+    var noGuessingName: String? { noGuessing.map { "No Guessing (\($0.displayName))" } }
 }
 
 struct ModeStats: Codable, Equatable {

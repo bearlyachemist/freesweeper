@@ -5,8 +5,8 @@ import SweeperKit
 
 @MainActor
 struct StatsStoreTests {
-    let small = StatsMode(difficulty: Difficulty(width: 12, height: 12, mines: 18), noGuessing: false)
-    let large = StatsMode(difficulty: Difficulty(width: 36, height: 36, mines: 160), noGuessing: false)
+    let small = StatsMode(difficulty: Difficulty(width: 12, height: 12, mines: 18), noGuessing: nil)
+    let large = StatsMode(difficulty: Difficulty(width: 36, height: 36, mines: 160), noGuessing: nil)
 
     @Test func winsBuildStreaksAndTimes() {
         let store = StatsStore(defaults: makeDefaults())
@@ -44,7 +44,7 @@ struct StatsStoreTests {
 
     @Test func noGuessingIsItsOwnMode() {
         let store = StatsStore(defaults: makeDefaults())
-        let noGuess = StatsMode(difficulty: Difficulty(width: 12, height: 12, mines: 18), noGuessing: true)
+        let noGuess = StatsMode(difficulty: Difficulty(width: 12, height: 12, mines: 18), noGuessing: .hard)
         store.record(won: true, time: 10, mode: noGuess)
         #expect(store.stats(for: noGuess).won == 1)
         #expect(store.stats(for: small).won == 0)

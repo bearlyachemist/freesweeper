@@ -9,7 +9,7 @@ struct AppSettingsTests {
         let settings = AppSettings(defaults: makeDefaults())
         #expect(settings.appearance == .system)
         #expect(settings.themeStyle == .classic)
-        #expect(!settings.noGuessing)
+        #expect(settings.noGuessing == .off)
         #expect(settings.showMinesRemaining && settings.showTimer)
         #expect(!settings.showLockButton)
         #expect(settings.hapticsEnabled && settings.soundEffects && !settings.timerTick)
@@ -22,7 +22,7 @@ struct AppSettingsTests {
         let settings = AppSettings(defaults: defaults)
         settings.themeStyle = .modern
         settings.appearance = .dark
-        settings.noGuessing = true
+        settings.noGuessing = .easy
         settings.showTimer = false
         settings.showLockButton = true
         settings.longPressDuration = 0.5
@@ -31,11 +31,19 @@ struct AppSettingsTests {
         let reloaded = AppSettings(defaults: defaults)
         #expect(reloaded.themeStyle == .modern)
         #expect(reloaded.appearance == .dark)
-        #expect(reloaded.noGuessing)
+        #expect(reloaded.noGuessing == .easy)
         #expect(!reloaded.showTimer)
         #expect(reloaded.showLockButton)
         #expect(reloaded.longPressDuration == 0.5)
         #expect(reloaded.difficulty == Difficulty(shape: .rectangle, size: .large, level: .hard))
+    }
+
+    @Test func oldNoGuessingSwitchBecomesHard() {
+        let defaults = makeDefaults()
+        defaults.set(true, forKey: "noGuessing")
+        #expect(AppSettings(defaults: defaults).noGuessing == .hard)
+        AppSettings(defaults: defaults).noGuessing = .off
+        #expect(AppSettings(defaults: defaults).noGuessing == .off)
     }
 
     @Test func outOfRangeValuesAreClamped() throws {

@@ -20,6 +20,14 @@ struct Deductions {
     var isEmpty: Bool { safe.isEmpty && mines.isEmpty }
 }
 
+/// How much reasoning a no-guess board may ask of the player.
+public enum NoGuessLogic: String, CaseIterable, Codable, Sendable {
+    /// Single numbers and overlapping pairs only (1-2-1, 1-1 against a wall, …). No mine counting.
+    case easy
+    /// Anything that follows from the numbers and the mine count.
+    case hard
+}
+
 /// A sound minesweeper solver: it only reports cells that are certain from what's visible.
 ///
 /// Reasoning is tried cheapest-first, stopping at the first level that finds anything:
@@ -30,6 +38,8 @@ struct Deductions {
 /// 3. **Regions**: every independent region of the frontier is enumerated exactly by
 ///    backtracking (state kept in 64-bit masks), then regions are combined with the total
 ///    mine count to decide cells, including unseen interior cells in the endgame.
+///
+/// `NoGuessLogic.easy` stops after level 2.
 enum Solver {
     struct Constraint {
         /// Unknown neighbours, ascending.
@@ -46,17 +56,22 @@ enum Solver {
 
     /// Certain deductions from `knowledge`. `active` lists the revealed cells worth examining
     /// (those touching an unknown); passing more is fine, just slower.
-    static func deduce(_ knowledge: Knowledge, grid: Grid, active: some Sequence<Int>) -> Deductions {
+    static func deduce(
+        _ knowledge: Knowledge,
+        grid: Grid,
+        active: some Sequence<Int>,
+        logic: NoGuessLogic = .hard
+    ) -> Deductions {
         let constraints = constraints(knowledge, grid: grid, active: active)
         let singles = singles(constraints)
         if !singles.isEmpty { return singles }
         let pairs = pairs(constraints)
-        if !pairs.isEmpty { return pairs }
+        if !pairs.isEmpty || logic == .easy { return pairs }
         return regions(knowledge, grid: grid, constraints: constraints)
     }
 
-    static func deduce(_ knowledge: Knowledge, grid: Grid) -> Deductions {
-        deduce(knowledge, grid: grid, active: 0..<grid.cellCount)
+    static func deduce(_ knowledge: Knowledge, grid: Grid, logic: NoGuessLogic = .hard) -> Deductions {
+        deduce(knowledge, grid: grid, active: 0..<grid.cellCount, logic: logic)
     }
 
     // MARK: - Constraints

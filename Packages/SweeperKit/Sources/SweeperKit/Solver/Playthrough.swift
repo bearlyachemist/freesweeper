@@ -3,6 +3,7 @@
 struct Playthrough {
     let grid: Grid
     let start: Int
+    let logic: NoGuessLogic
     private(set) var mines: [Bool]
     private(set) var knowledge: Knowledge
     private var numbers: [Int8]
@@ -14,9 +15,10 @@ struct Playthrough {
     /// stops and reports failure rather than crashing, so the board is simply rejected.
     private(set) var hitMine = false
 
-    init(grid: Grid, mines: [Bool], start: Int) {
+    init(grid: Grid, mines: [Bool], start: Int, logic: NoGuessLogic = .hard) {
         self.grid = grid
         self.start = start
+        self.logic = logic
         self.mines = mines
         let mineCount = mines.count { $0 }
         self.knowledge = Knowledge(cellCount: grid.cellCount, totalMines: mineCount)
@@ -35,7 +37,7 @@ struct Playthrough {
             active = active.filter { cell in
                 grid.neighbors[cell].contains { knowledge.cells[$0] == Knowledge.unknown }
             }
-            let deductions = Solver.deduce(knowledge, grid: grid, active: active)
+            let deductions = Solver.deduce(knowledge, grid: grid, active: active, logic: logic)
             if deductions.isEmpty { return false }
             for cell in deductions.mines { knowledge.cells[cell] = Knowledge.mine }
             for cell in deductions.safe { reveal(cell) }

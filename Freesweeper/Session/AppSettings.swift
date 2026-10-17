@@ -23,6 +23,32 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 }
 
+/// The No Guessing switch: off, or how much logic a board may ask for.
+enum NoGuessing: String, CaseIterable, Identifiable {
+    case off, easy, hard
+
+    var id: Self { self }
+
+    var logic: NoGuessLogic? {
+        switch self {
+        case .off: nil
+        case .easy: .easy
+        case .hard: .hard
+        }
+    }
+
+    var displayName: String { logic?.displayName ?? "Off" }
+
+    /// What the choice means, for the info popover in Settings.
+    var summary: String {
+        switch self {
+        case .off: "Ordinary random boards. Sometimes you'll have to guess."
+        case .easy: "Every board can be cleared with single numbers and simple patterns like 1-2-1. You never need the mine count."
+        case .hard: "Every board can be cleared by logic, but it may take longer chains of reasoning or the mine count near the end."
+        }
+    }
+}
+
 /// User preferences, persisted to UserDefaults on every change. Values read back are
 /// validated, so a corrupted or out-of-range entry falls back to something playable.
 @MainActor @Observable
@@ -36,8 +62,8 @@ final class AppSettings {
         didSet { defaults.set(themeStyle.rawValue, forKey: Key.themeStyle) }
     }
     /// Boards are built so they can be cleared by logic alone.
-    var noGuessing: Bool {
-        didSet { defaults.set(noGuessing, forKey: Key.noGuessing) }
+    var noGuessing: NoGuessing {
+        didSet { defaults.set(noGuessing.rawValue, forKey: Key.noGuessing) }
     }
     /// Hides the mine counter from the header.
     var showMinesRemaining: Bool {
@@ -85,7 +111,9 @@ final class AppSettings {
         self.defaults = defaults
         appearance = defaults.string(forKey: Key.appearance).flatMap(Appearance.init) ?? .system
         themeStyle = defaults.string(forKey: Key.themeStyle).flatMap(ThemeStyle.init) ?? .classic
-        noGuessing = defaults.bool(forKey: Key.noGuessing)
+        // No Guessing used to be on/off, and its boards were what's now Hard.
+        noGuessing = defaults.string(forKey: Key.noGuessing).flatMap(NoGuessing.init)
+            ?? (defaults.bool(forKey: Key.legacyNoGuessing) ? .hard : .off)
         showMinesRemaining = defaults.object(forKey: Key.showMinesRemaining) as? Bool ?? true
         showTimer = defaults.object(forKey: Key.showTimer) as? Bool ?? true
         showLockButton = defaults.bool(forKey: Key.showLockButton)
@@ -104,7 +132,8 @@ final class AppSettings {
     private enum Key {
         static let appearance = "appearance"
         static let themeStyle = "themeStyle"
-        static let noGuessing = "noGuessing"
+        static let noGuessing = "noGuessingLogic"
+        static let legacyNoGuessing = "noGuessing"
         static let showMinesRemaining = "showMinesRemaining"
         static let showTimer = "showTimer"
         static let showLockButton = "showLockButton"

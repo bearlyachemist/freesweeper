@@ -62,7 +62,7 @@ struct Harness {
 
     /// A harness already partway through the corner-mine game.
     static func started(configure: (AppSettings) -> Void = { _ in }) -> Harness {
-        Harness(saved: SavedGame(game: startedCornerMineGame(), elapsedSeconds: 12.5, isNoGuessBoard: false), configure: configure)
+        Harness(saved: SavedGame(game: startedCornerMineGame(), elapsedSeconds: 12.5, noGuessLogic: nil), configure: configure)
     }
 }
 

@@ -11,7 +11,7 @@ struct SettingsScreen: View {
         NavigationStack {
             Form {
                 gameSection
-                StatsSection(mode: StatsMode(difficulty: settings.difficulty, noGuessing: settings.noGuessing))
+                StatsSection(mode: StatsMode(difficulty: settings.difficulty, noGuessing: settings.noGuessing.logic))
 
                 Section("Look") {
                     Picker("Style", selection: $settings.themeStyle) {
@@ -85,7 +85,23 @@ struct SettingsScreen: View {
             )) {
                 ForEach(Difficulty.Level.allCases, id: \.self) { Text($0.displayName).tag(Optional($0)) }
             }
-            Toggle("No Guessing", isOn: $settings.noGuessing)
+            optionRow("No Guessing", selection: Binding(
+                get: { settings.noGuessing },
+                set: { if let mode = $0 { settings.noGuessing = mode } }
+            )) {
+                ForEach(NoGuessing.allCases) { Text($0.displayName).tag(Optional($0)) }
+            } accessory: {
+                InfoButton("About No Guessing") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(NoGuessing.allCases) { mode in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(mode.displayName).font(.headline)
+                                Text(mode.summary)
+                            }
+                        }
+                    }
+                }
+            }
             NavigationLink("Custom…") {
                 CustomDifficultyScreen { dismiss() }
             }
@@ -102,14 +118,57 @@ struct SettingsScreen: View {
         selection: Binding<Value?>,
         @ViewBuilder options: () -> Options
     ) -> some View {
+        optionRow(title, selection: selection, options: options) { EmptyView() }
+    }
+
+    /// An option row with `accessory` beside its caption.
+    private func optionRow<Value: Hashable, Options: View, Accessory: View>(
+        _ title: String,
+        selection: Binding<Value?>,
+        @ViewBuilder options: () -> Options,
+        @ViewBuilder accessory: () -> Accessory
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                accessory()
+            }
             Picker(title, selection: selection, content: options)
                 .pickerStyle(.segmented)
                 .labelsHidden()
         }
         .padding(.vertical, 4)
+    }
+}
+
+/// An ⓘ that shows `content` in a popover, kept as a popover on iPhone too.
+private struct InfoButton<Content: View>: View {
+    let label: String
+    @ViewBuilder let content: Content
+    @State private var isShowing = false
+
+    init(_ label: String, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.content = content()
+    }
+
+    var body: some View {
+        Button { isShowing = true } label: {
+            Image(systemName: "info.circle")
+                .font(.subheadline)
+        }
+        // Borderless, so only the icon is tappable and the rest of the row still works.
+        .buttonStyle(.borderless)
+        .accessibilityLabel(label)
+        .popover(isPresented: $isShowing) {
+            content
+                .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: 300, alignment: .leading)
+                .padding()
+                .presentationCompactAdaptation(.popover)
+        }
     }
 }

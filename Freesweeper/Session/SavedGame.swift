@@ -5,9 +5,37 @@ import SweeperKit
 struct SavedGame: Codable {
     var game: Game
     var elapsedSeconds: Double
-    var isNoGuessBoard: Bool
+    /// The logic the board was built for, or `nil` for an ordinary random board.
+    var noGuessLogic: NoGuessLogic?
 
     private static let key = "savedGame"
+
+    init(game: Game, elapsedSeconds: Double, noGuessLogic: NoGuessLogic?) {
+        self.game = game
+        self.elapsedSeconds = elapsedSeconds
+        self.noGuessLogic = noGuessLogic
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case game, elapsedSeconds, noGuessLogic
+        /// Saves from before Easy existed; those no-guess boards were Hard.
+        case isNoGuessBoard
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        game = try container.decode(Game.self, forKey: .game)
+        elapsedSeconds = try container.decode(Double.self, forKey: .elapsedSeconds)
+        let legacy = try container.decodeIfPresent(Bool.self, forKey: .isNoGuessBoard) ?? false
+        noGuessLogic = try container.decodeIfPresent(NoGuessLogic.self, forKey: .noGuessLogic) ?? (legacy ? .hard : nil)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(game, forKey: .game)
+        try container.encode(elapsedSeconds, forKey: .elapsedSeconds)
+        try container.encodeIfPresent(noGuessLogic, forKey: .noGuessLogic)
+    }
 
     /// The saved game if it's an unfinished, intact game; anything else is discarded.
     static func load(from defaults: UserDefaults) -> SavedGame? {

@@ -21,8 +21,9 @@ struct FormattingTests {
 
     @Test func statsModeNameMarksNoGuessing() {
         let difficulty = Difficulty(shape: .square, size: .small, level: .easy)
-        #expect(StatsMode(difficulty: difficulty, noGuessing: true).name == "Small Square · Easy · No Guessing")
-        #expect(StatsMode(difficulty: difficulty, noGuessing: false).name == "Small Square · Easy")
+        #expect(StatsMode(difficulty: difficulty, noGuessing: .easy).name == "Small Square · Easy · No Guessing (Easy)")
+        #expect(StatsMode(difficulty: difficulty, noGuessing: .hard).name == "Small Square · Easy · No Guessing (Hard)")
+        #expect(StatsMode(difficulty: difficulty, noGuessing: nil).name == "Small Square · Easy")
     }
 }
 
