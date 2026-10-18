@@ -62,6 +62,16 @@ extension Palette {
 struct ModernCellRenderer: CellRenderer {
     let palette: Palette
 
+    /// What a cell paints, bottom to top. See `PaintBatch`.
+    private enum Layer: CaseIterable {
+        case face, pressed, revealed, exploded
+        case flagPole, flagPennant, fadedFlagPole, fadedFlagPennant
+        case mineSpikes, mineBody, mineGlint, explodedSpikes, explodedBody, explodedGlint, slash
+    }
+
+    /// A wrong flag's flag shows faded under the slash.
+    private static let fadedFlagOpacity = 0.45
+
     func draw(_ board: BoardDrawing, in context: GraphicsContext) {
         let s = board.cellSize
         let gap = max(1, (s * 0.08 * board.displayScale).rounded() / board.displayScale)
@@ -70,6 +80,8 @@ struct ModernCellRenderer: CellRenderer {
         let numbers = (1...8).map { n in
             context.resolve(Text("\(n)").font(font).foregroundStyle(palette.numbers[n - 1]))
         }
+        var batch = PaintBatch<Layer>()
+        var texts: [(number: Int, at: CGPoint)] = []
 
         for row in board.visibleRows {
             for column in board.visibleColumns {
@@ -78,34 +90,56 @@ struct ModernCellRenderer: CellRenderer {
                 let center = CGPoint(x: rect.midX, y: rect.midY)
                 switch board.visual(column: column, row: row) {
                 case .hidden:
-                    context.fill(tile, with: .color(palette.face))
+                    batch.fill(tile, in: .face)
                 case .pressed:
-                    context.fill(tile, with: .color(palette.pressed))
+                    batch.fill(tile, in: .pressed)
                 case .flagged:
-                    context.fill(tile, with: .color(palette.face))
-                    drawFlag(in: rect, context: context)
+                    batch.fill(tile, in: .face)
+                    addFlag(in: rect, pole: .flagPole, pennant: .flagPennant, to: &batch)
                 case .revealed(let n):
-                    context.fill(tile, with: .color(palette.revealed))
-                    if n > 0 { context.draw(numbers[n - 1], at: center) }
+                    batch.fill(tile, in: .revealed)
+                    if n > 0 { texts.append((n, center)) }
                 case .mine:
-                    context.fill(tile, with: .color(palette.revealed))
-                    drawMine(in: rect, color: palette.mine, context: context)
+                    batch.fill(tile, in: .revealed)
+                    addMine(in: rect, spikes: .mineSpikes, body: .mineBody, glint: .mineGlint, to: &batch)
                 case .explodedMine:
-                    context.fill(tile, with: .color(palette.exploded))
-                    drawMine(in: rect, color: .white, context: context)
+                    batch.fill(tile, in: .exploded)
+                    addMine(in: rect, spikes: .explodedSpikes, body: .explodedBody, glint: .explodedGlint, to: &batch)
                 case .wrongFlag:
-                    context.fill(tile, with: .color(palette.revealed))
-                    drawFlag(in: rect, context: context, opacity: 0.45)
-                    drawSlash(in: rect, context: context)
+                    batch.fill(tile, in: .revealed)
+                    addFlag(in: rect, pole: .fadedFlagPole, pennant: .fadedFlagPennant, to: &batch)
+                    addSlash(in: rect, to: &batch)
                 }
             }
         }
+
+        batch.draw(in: context, color: color(of:))
+        // Numbers never share a cell with a glyph, so drawing them last keeps every cell's order.
+        for text in texts { context.draw(numbers[text.number - 1], at: text.at) }
     }
 
-    private func drawMine(in rect: CGRect, color: Color, context: GraphicsContext) {
+    private func color(of layer: Layer) -> Color {
+        switch layer {
+        case .face: palette.face
+        case .pressed: palette.pressed
+        case .revealed: palette.revealed
+        case .exploded: palette.exploded
+        case .flagPole: palette.ink.opacity(0.8)
+        case .flagPennant: palette.flag
+        case .fadedFlagPole: palette.ink.opacity(0.8 * Self.fadedFlagOpacity)
+        case .fadedFlagPennant: palette.flag.opacity(Self.fadedFlagOpacity)
+        case .mineSpikes, .mineBody: palette.mine
+        case .mineGlint: palette.mineHighlight.opacity(0.8)
+        case .explodedSpikes, .explodedBody: .white
+        case .explodedGlint: palette.exploded.opacity(0.8)
+        case .slash: palette.wrongMark
+        }
+    }
+
+    private func addMine(in rect: CGRect, spikes: Layer, body: Layer, glint: Layer, to batch: inout PaintBatch<Layer>) {
         let s = rect.width
         let c = CGPoint(x: rect.midX, y: rect.midY)
-        let spikes = Path { p in
+        let spikePath = Path { p in
             for i in 0..<8 {
                 let angle = Double(i) * .pi / 4
                 let inner = s * 0.14, outer = s * 0.3
@@ -113,29 +147,24 @@ struct ModernCellRenderer: CellRenderer {
                 p.addLine(to: CGPoint(x: c.x + cos(angle) * outer, y: c.y + sin(angle) * outer))
             }
         }
-        context.stroke(spikes, with: .color(color), style: StrokeStyle(lineWidth: max(1, s * 0.07), lineCap: .round))
+        batch.stroke(spikePath, style: StrokeStyle(lineWidth: max(1, s * 0.07), lineCap: .round), in: spikes)
         let r = s * 0.19
-        context.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)), with: .color(color))
-        let glint = r * 0.5
-        context.fill(
-            Path(ellipseIn: CGRect(x: c.x - r * 0.55, y: c.y - r * 0.55, width: glint, height: glint)),
-            with: .color((color == .white ? palette.exploded : palette.mineHighlight).opacity(0.8))
-        )
+        batch.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)), in: body)
+        let size = r * 0.5
+        batch.fill(Path(ellipseIn: CGRect(x: c.x - r * 0.55, y: c.y - r * 0.55, width: size, height: size)), in: glint)
     }
 
-    private func drawFlag(in rect: CGRect, context: GraphicsContext, opacity: Double = 1) {
+    private func addFlag(in rect: CGRect, pole: Layer, pennant: Layer, to batch: inout PaintBatch<Layer>) {
         let s = rect.width
         let poleX = rect.minX + s * 0.36
         let top = rect.minY + s * 0.22
         let bottom = rect.minY + s * 0.78
-        var context = context
-        context.opacity = opacity
-        let pole = Path { p in
+        let polePath = Path { p in
             p.move(to: CGPoint(x: poleX, y: top))
             p.addLine(to: CGPoint(x: poleX, y: bottom))
         }
-        context.stroke(pole, with: .color(palette.ink.opacity(0.8)), style: StrokeStyle(lineWidth: max(1, s * 0.07), lineCap: .round))
-        let pennant = Path { p in
+        batch.stroke(polePath, style: StrokeStyle(lineWidth: max(1, s * 0.07), lineCap: .round), in: pole)
+        let pennantPath = Path { p in
             p.move(to: CGPoint(x: poleX, y: top))
             p.addQuadCurve(
                 to: CGPoint(x: poleX + s * 0.36, y: top + s * 0.14),
@@ -147,15 +176,15 @@ struct ModernCellRenderer: CellRenderer {
             )
             p.closeSubpath()
         }
-        context.fill(pennant, with: .color(palette.flag))
+        batch.fill(pennantPath, in: pennant)
     }
 
-    private func drawSlash(in rect: CGRect, context: GraphicsContext) {
+    private func addSlash(in rect: CGRect, to batch: inout PaintBatch<Layer>) {
         let inset = rect.insetBy(dx: rect.width * 0.2, dy: rect.height * 0.2)
         let slash = Path { p in
             p.move(to: CGPoint(x: inset.minX, y: inset.maxY))
             p.addLine(to: CGPoint(x: inset.maxX, y: inset.minY))
         }
-        context.stroke(slash, with: .color(palette.wrongMark), style: StrokeStyle(lineWidth: max(1.5, rect.width * 0.09), lineCap: .round))
+        batch.stroke(slash, style: StrokeStyle(lineWidth: max(1.5, rect.width * 0.09), lineCap: .round), in: .slash)
     }
 }

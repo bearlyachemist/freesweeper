@@ -84,6 +84,12 @@ struct ClassicCellRenderer: CellRenderer {
     let palette: Palette
     let colors: ClassicColors
 
+    /// What a cell paints, bottom to top. See `PaintBatch`.
+    private enum Layer: CaseIterable {
+        case face, revealed, pressed, exploded, grid, bevelLight, bevelDark
+        case pennant, flagInk, mineSpikes, mineBody, mineGlint, cross
+    }
+
     func draw(_ board: BoardDrawing, in context: GraphicsContext) {
         let s = board.cellSize
         let font = Font.system(size: s * 0.66, weight: .heavy, design: .rounded)
@@ -91,6 +97,8 @@ struct ClassicCellRenderer: CellRenderer {
             context.resolve(Text("\(n)").font(font).foregroundStyle(palette.numbers[n - 1]))
         }
         let bevel = max(1.5, (s / 10).rounded())
+        var batch = PaintBatch<Layer>()
+        var texts: [(number: Int, at: CGPoint)] = []
 
         for row in board.visibleRows {
             for column in board.visibleColumns {
@@ -98,28 +106,32 @@ struct ClassicCellRenderer: CellRenderer {
                 let center = CGPoint(x: rect.midX, y: rect.midY)
                 switch board.visual(column: column, row: row) {
                 case .hidden:
-                    drawRaised(rect, bevel: bevel, in: context)
+                    addRaised(rect, bevel: bevel, to: &batch)
                 case .flagged:
-                    drawRaised(rect, bevel: bevel, in: context)
-                    drawFlag(in: rect, context: context)
+                    addRaised(rect, bevel: bevel, to: &batch)
+                    addFlag(in: rect, to: &batch)
                 case .pressed:
-                    drawFlat(rect, fill: palette.pressed, in: context)
+                    addFlat(rect, fill: .pressed, to: &batch)
                 case .revealed(let n):
-                    drawFlat(rect, fill: palette.revealed, in: context)
-                    if n > 0 { context.draw(numbers[n - 1], at: center) }
+                    addFlat(rect, fill: .revealed, to: &batch)
+                    if n > 0 { texts.append((n, center)) }
                 case .mine:
-                    drawFlat(rect, fill: palette.revealed, in: context)
-                    drawMine(in: rect, context: context)
+                    addFlat(rect, fill: .revealed, to: &batch)
+                    addMine(in: rect, to: &batch)
                 case .explodedMine:
-                    drawFlat(rect, fill: palette.exploded, in: context)
-                    drawMine(in: rect, context: context)
+                    addFlat(rect, fill: .exploded, to: &batch)
+                    addMine(in: rect, to: &batch)
                 case .wrongFlag:
-                    drawFlat(rect, fill: palette.revealed, in: context)
-                    drawMine(in: rect, context: context)
-                    drawCross(in: rect, context: context)
+                    addFlat(rect, fill: .revealed, to: &batch)
+                    addMine(in: rect, to: &batch)
+                    addCross(in: rect, to: &batch)
                 }
             }
         }
+
+        batch.draw(in: context, color: color(of:))
+        // Numbers never share a cell with a glyph, so drawing them last keeps every cell's order.
+        for text in texts { context.draw(numbers[text.number - 1], at: text.at) }
 
         // Cells only draw their top/left grid lines, so close the board's right and bottom edges.
         let edge = board.rect(column: board.columns - 1, row: board.rows - 1)
@@ -128,20 +140,38 @@ struct ClassicCellRenderer: CellRenderer {
         context.fill(Path(CGRect(x: 0, y: edge.maxY - 1, width: edge.maxX, height: 1)), with: line)
     }
 
-    private func drawRaised(_ rect: CGRect, bevel: CGFloat, in context: GraphicsContext) {
-        context.fill(Path(rect), with: .color(palette.face))
-        context.fill(BevelGeometry.topLeading(rect, width: bevel), with: .color(colors.bevelLight))
-        context.fill(BevelGeometry.bottomTrailing(rect, width: bevel), with: .color(colors.bevelDark))
+    private func color(of layer: Layer) -> Color {
+        switch layer {
+        case .face: palette.face
+        case .revealed: palette.revealed
+        case .pressed: palette.pressed
+        case .exploded: palette.exploded
+        case .grid: colors.gridLine
+        case .bevelLight: colors.bevelLight
+        case .bevelDark: colors.bevelDark
+        case .pennant: palette.flag
+        case .flagInk: palette.ink
+        case .mineSpikes, .mineBody: palette.mine
+        case .mineGlint: palette.mineHighlight
+        case .cross: palette.wrongMark
+        }
+    }
+
+    private func addRaised(_ rect: CGRect, bevel: CGFloat, to batch: inout PaintBatch<Layer>) {
+        batch.fill(rect, in: .face)
+        batch.fill(BevelGeometry.topLeading(rect, width: bevel), in: .bevelLight)
+        batch.fill(BevelGeometry.bottomTrailing(rect, width: bevel), in: .bevelDark)
     }
 
     /// Flat fill with a grid line on the top and left (`draw` closes the board's far edges).
-    private func drawFlat(_ rect: CGRect, fill: Color, in context: GraphicsContext) {
-        context.fill(Path(rect), with: .color(fill))
-        context.fill(Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: 1)), with: .color(colors.gridLine))
-        context.fill(Path(CGRect(x: rect.minX, y: rect.minY, width: 1, height: rect.height)), with: .color(colors.gridLine))
+    private func addFlat(_ rect: CGRect, fill: Layer, to batch: inout PaintBatch<Layer>) {
+        batch.fill(rect, in: fill)
+        // The two lines overlap at the corner; same-direction rects keep it filled.
+        batch.fill(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: 1), in: .grid)
+        batch.fill(CGRect(x: rect.minX, y: rect.minY, width: 1, height: rect.height), in: .grid)
     }
 
-    private func drawMine(in rect: CGRect, context: GraphicsContext) {
+    private func addMine(in rect: CGRect, to batch: inout PaintBatch<Layer>) {
         let s = rect.width
         let c = CGPoint(x: rect.midX, y: rect.midY)
         let long = s * 0.36
@@ -152,18 +182,15 @@ struct ClassicCellRenderer: CellRenderer {
             p.move(to: CGPoint(x: c.x - short, y: c.y - short)); p.addLine(to: CGPoint(x: c.x + short, y: c.y + short))
             p.move(to: CGPoint(x: c.x - short, y: c.y + short)); p.addLine(to: CGPoint(x: c.x + short, y: c.y - short))
         }
-        context.stroke(spikes, with: .color(palette.mine), lineWidth: max(1, s * 0.08))
+        batch.stroke(spikes, style: StrokeStyle(lineWidth: max(1, s * 0.08)), in: .mineSpikes)
 
         let r = s * 0.25
-        context.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)), with: .color(palette.mine))
+        batch.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)), in: .mineBody)
         let glint = r * 0.42
-        context.fill(
-            Path(CGRect(x: c.x - r * 0.55, y: c.y - r * 0.55, width: glint, height: glint)),
-            with: .color(palette.mineHighlight)
-        )
+        batch.fill(CGRect(x: c.x - r * 0.55, y: c.y - r * 0.55, width: glint, height: glint), in: .mineGlint)
     }
 
-    private func drawFlag(in rect: CGRect, context: GraphicsContext) {
+    private func addFlag(in rect: CGRect, to batch: inout PaintBatch<Layer>) {
         let s = rect.width
         let poleX = rect.minX + s * 0.56
         let top = rect.minY + s * 0.18
@@ -173,19 +200,19 @@ struct ClassicCellRenderer: CellRenderer {
             p.addLine(to: CGPoint(x: rect.minX + s * 0.22, y: top + s * 0.16))
             p.closeSubpath()
         }
-        context.fill(pennant, with: .color(palette.flag))
-        let ink = GraphicsContext.Shading.color(palette.ink)
-        context.fill(Path(CGRect(x: poleX - s * 0.035, y: top, width: s * 0.07, height: s * 0.54)), with: ink)
-        context.fill(Path(CGRect(x: rect.minX + s * 0.36, y: rect.minY + s * 0.66, width: s * 0.36, height: s * 0.07)), with: ink)
-        context.fill(Path(CGRect(x: rect.minX + s * 0.24, y: rect.minY + s * 0.72, width: s * 0.6, height: s * 0.09)), with: ink)
+        batch.fill(pennant, in: .pennant)
+        // Overlapping rects all wind the same way, so their union fills solid.
+        batch.fill(CGRect(x: poleX - s * 0.035, y: top, width: s * 0.07, height: s * 0.54), in: .flagInk)
+        batch.fill(CGRect(x: rect.minX + s * 0.36, y: rect.minY + s * 0.66, width: s * 0.36, height: s * 0.07), in: .flagInk)
+        batch.fill(CGRect(x: rect.minX + s * 0.24, y: rect.minY + s * 0.72, width: s * 0.6, height: s * 0.09), in: .flagInk)
     }
 
-    private func drawCross(in rect: CGRect, context: GraphicsContext) {
+    private func addCross(in rect: CGRect, to batch: inout PaintBatch<Layer>) {
         let inset = rect.insetBy(dx: rect.width * 0.16, dy: rect.height * 0.16)
         let cross = Path { p in
             p.move(to: CGPoint(x: inset.minX, y: inset.minY)); p.addLine(to: CGPoint(x: inset.maxX, y: inset.maxY))
             p.move(to: CGPoint(x: inset.minX, y: inset.maxY)); p.addLine(to: CGPoint(x: inset.maxX, y: inset.minY))
         }
-        context.stroke(cross, with: .color(palette.wrongMark), lineWidth: max(1.5, rect.width * 0.09))
+        batch.stroke(cross, style: StrokeStyle(lineWidth: max(1.5, rect.width * 0.09)), in: .cross)
     }
 }
