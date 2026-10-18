@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The current mode in small text, over: mine counter · (lock), (hint), flag toggle, smiley,
+/// The current mode in small text, over: mine counter · (lock), flag toggle, smiley, (hint),
 /// settings · timer. Draws compact when the full row doesn't fit.
 struct HeaderView: View {
     static let buttonRowHeight: CGFloat = 52
@@ -53,11 +53,12 @@ struct HeaderView: View {
             if settings.showLockButton {
                 LockToggle()
             }
+            FlagModeToggle()
+            SmileyButton(face: session.face) { flow.requestNewGame() }
+            // Hint sits right of the smiley, so with lock on too it stays centred.
             if settings.showHintButton {
                 HintToggle()
             }
-            FlagModeToggle()
-            SmileyButton(face: session.face) { flow.requestNewGame() }
             SettingsButton(action: onSettings)
             ZStack {
                 if settings.showTimer {
