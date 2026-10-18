@@ -25,6 +25,12 @@ struct GameScreen: View {
         .confirmsNewGame(isEnabled: !isShowingSettings)
         .sheet(isPresented: $isShowingSettings) { SettingsScreen() }
         .onChange(of: scenePhase, initial: true) { session.scenePhaseChanged($1) }
+        .alert("It's a Guess", isPresented: guessOffered) {
+            Button("Show a Mine") { session.flagGuessMine() }
+            Button("Cancel", role: .cancel) { session.guessMine = nil }
+        } message: {
+            Text("Nothing on the board settles the next move. Want a mine flagged for you?")
+        }
         .alert("No Guessing Unavailable", isPresented: noGuessUnavailable) {
             Button("Reset") { flow.requestNewGame() }
             Button("OK", role: .cancel) {}
@@ -42,6 +48,10 @@ struct GameScreen: View {
             case .ready, .playing: nil
             }
         }
+    }
+
+    private var guessOffered: Binding<Bool> {
+        Binding(get: { session.guessMine != nil }, set: { if !$0 { session.guessMine = nil } })
     }
 
     private var noGuessUnavailable: Binding<Bool> {

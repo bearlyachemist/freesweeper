@@ -1,6 +1,12 @@
 import SwiftUI
 import SweeperKit
 
+/// The numbers a hint points at, and whether the mine counter is part of it.
+struct HintHighlight: Equatable {
+    let numbers: Set<Coord>
+    let usesMineCount: Bool
+}
+
 enum InputMode {
     /// Tap digs, long press flags.
     case reveal
@@ -27,6 +33,14 @@ final class GameSession {
     private(set) var isGenerating = false
     /// The logic the no-guess generator built the current board for, or `nil` if it didn't.
     private(set) var noGuessLogic: NoGuessLogic?
+    /// What the hint button is pointing at, until the next move.
+    private(set) var hint: HintHighlight?
+    /// A hint found nothing certain; this mine can be flagged to get past the guess.
+    var guessMine: Coord?
+    /// The hint button showed during this game (sticky once a move is made with it on).
+    private(set) var hintsThisGame: Bool
+    /// Where the last tap or long press landed, so hints start near where she's looking.
+    private var lastMove: Coord?
     /// Called with the recorded result when a game is won or lost.
     @ObservationIgnored var onFinish: (@MainActor (GameResult) -> Void)?
     /// Called when No Guessing couldn't build the board in time; nothing was dug.
@@ -60,10 +74,12 @@ final class GameSession {
             game = saved.game
             clock = GameClock(elapsed: .seconds(saved.elapsedSeconds))
             noGuessLogic = saved.noGuessLogic
+            hintsThisGame = saved.hints
         } else {
             game = Game(difficulty: settings.difficulty, seed: .random(in: .min ... .max))
             clock = GameClock()
             noGuessLogic = nil
+            hintsThisGame = false
         }
     }
 
@@ -87,9 +103,13 @@ final class GameSession {
     var isInputLocked: Bool { isLocked && settings.showLockButton }
 
     /// The mode of the board being played. Before the first dig the No Guessing switch decides;
-    /// after, what the board actually is.
+    /// after, what the board actually is. Hints count if the button is showing or showed earlier.
     var statsMode: StatsMode {
-        StatsMode(difficulty: game.difficulty, noGuessing: game.needsMines ? settings.noGuessing.logic : noGuessLogic)
+        StatsMode(
+            difficulty: game.difficulty,
+            noGuessing: game.needsMines ? settings.noGuessing.logic : noGuessLogic,
+            hints: hintsThisGame || settings.showHintButton
+        )
     }
 
     // MARK: - Actions
@@ -107,12 +127,17 @@ final class GameSession {
         pressedCells = []
         gameID += 1
         noGuessLogic = nil
+        hint = nil
+        guessMine = nil
+        hintsThisGame = false
+        lastMove = nil
         SavedGame.clear(from: defaults)
         updateTicking()
     }
 
     func tap(_ coord: Coord) {
         guard !isGenerating, !isInputLocked else { return }
+        lastMove = coord
         // Tapping a revealed number chords, whatever the mode.
         if game.board[coord].state == .revealed {
             update { $0.chord(coord) }
@@ -123,7 +148,30 @@ final class GameSession {
 
     func longPress(_ coord: Coord) {
         guard !isGenerating, !isInputLocked, game.board[coord].state != .revealed else { return }
+        lastMove = coord
         inputMode == .reveal ? flag(coord) : dig(coord)
+    }
+
+    /// Shows a hint, or hides the one showing. When nothing is certain, offers a mine instead.
+    func toggleHint() {
+        if hint != nil {
+            hint = nil
+            return
+        }
+        guard game.status == .playing else { return }
+        hintsThisGame = true
+        switch game.hint(near: lastMove) {
+        case .clue(let numbers, let usesMineCount): hint = HintHighlight(numbers: numbers, usesMineCount: usesMineCount)
+        case .guess(let mine): guessMine = mine
+        case nil: break
+        }
+    }
+
+    /// Flags the mine a guess hint offered.
+    func flagGuessMine() {
+        guard let mine = guessMine else { return }
+        guessMine = nil
+        if game.board[mine].state == .hidden { flag(mine) }
     }
 
     /// Finger down/moved (`coord`) or lifted (`nil`).
@@ -149,7 +197,7 @@ final class GameSession {
 
     private func persist() {
         if game.status == .playing {
-            SavedGame(game: game, elapsedSeconds: clock.elapsed().seconds, noGuessLogic: noGuessLogic)
+            SavedGame(game: game, elapsedSeconds: clock.elapsed().seconds, noGuessLogic: noGuessLogic, hints: hintsThisGame)
                 .save(to: defaults)
         } else {
             SavedGame.clear(from: defaults)
@@ -200,12 +248,14 @@ final class GameSession {
 
     private func flag(_ coord: Coord) {
         guard game.toggleFlag(coord) else { return }
+        moved()
         flagChanges += 1
         play(.flag)
     }
 
     private func update(_ action: (inout Game) -> Bool) {
         guard action(&game) else { return }
+        moved()
         switch game.status {
         case .playing:
             clock.start()
@@ -222,6 +272,12 @@ final class GameSession {
             break
         }
         updateTicking()
+    }
+
+    /// Any move clears the hint, and makes this a hints game if the button is showing.
+    private func moved() {
+        hint = nil
+        if settings.showHintButton { hintsThisGame = true }
     }
 
     private func finish(won: Bool) {

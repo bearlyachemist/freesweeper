@@ -14,6 +14,15 @@ struct GameFlowTests {
         #expect(h.flow.pendingNewGame == nil)
     }
 
+    @Test func startingACustomBoardAddsItToRecents() {
+        let h = Harness()
+        h.flow.requestNewGame(next)
+        #expect(h.settings.recentCustomBoards.isEmpty, "Presets aren't recents")
+        let custom = Difficulty.custom(width: 30, height: 30, mines: 150)
+        h.flow.requestNewGame(custom)
+        #expect(h.settings.recentCustomBoards.map(\.difficulty) == [custom])
+    }
+
     @Test func startedGameWithoutAStreakRestartsAtOnce() {
         let h = Harness.started()
         #expect(h.flow.requestNewGame(next))

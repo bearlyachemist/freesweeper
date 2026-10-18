@@ -11,6 +11,7 @@ struct HeaderButtonStyle: ButtonStyle {
 
     private struct ThemedButtonBody: View {
         @Environment(\.theme) private var theme
+        @Environment(\.compactHeader) private var compact
         let configuration: Configuration
         let isSelected: Bool
 
@@ -21,14 +22,14 @@ struct HeaderButtonStyle: ButtonStyle {
                 let isSunken = configuration.isPressed || isSelected
                 configuration.label
                     .foregroundStyle(palette.ink)
-                    .padding(5)
+                    .padding(compact ? 3 : 5)
                     .offset(x: isSunken ? 1 : 0, y: isSunken ? 1 : 0)
                     .background(palette.face)
                     .bevel(isSunken ? .sunken : .raised, width: 3, colors: colors)
             case .modern:
                 configuration.label
                     .foregroundStyle(palette.ink)
-                    .frame(width: 44, height: 44)
+                    .frame(width: compact ? 38 : 44, height: compact ? 38 : 44)
                     .background(
                         isSelected ? palette.accent : palette.buttonFill,
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous)

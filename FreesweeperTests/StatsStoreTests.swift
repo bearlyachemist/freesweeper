@@ -47,6 +47,8 @@ struct StatsStoreTests {
         let noGuess = StatsMode(difficulty: Difficulty(width: 12, height: 12, mines: 18), noGuessing: .hard)
         store.record(won: true, time: 10, mode: noGuess)
         #expect(store.stats(for: noGuess).won == 1)
+        let hints = StatsMode(difficulty: Difficulty(width: 12, height: 12, mines: 18), noGuessing: .hard, hints: true)
+        #expect(store.stats(for: hints).played == 0, "Hints are their own mode")
         #expect(store.stats(for: small).won == 0)
     }
 

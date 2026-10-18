@@ -11,7 +11,7 @@ struct SettingsScreen: View {
         NavigationStack {
             Form {
                 gameSection
-                StatsSection(mode: StatsMode(difficulty: settings.difficulty, noGuessing: settings.noGuessing.logic))
+                StatsSection(mode: StatsMode(difficulty: settings.difficulty, noGuessing: settings.noGuessing.logic, hints: settings.showHintButton))
 
                 Section("Look") {
                     Picker("Style", selection: $settings.themeStyle) {
@@ -26,6 +26,7 @@ struct SettingsScreen: View {
                     Toggle("Show Mines Remaining", isOn: $settings.showMinesRemaining)
                     Toggle("Show Timer", isOn: $settings.showTimer)
                     Toggle("Show Lock Button", isOn: $settings.showLockButton)
+                    Toggle("Show Hint Button", isOn: $settings.showHintButton)
                     Toggle("Haptics", isOn: $settings.hapticsEnabled)
                     VStack(alignment: .leading) {
                         Text("Long Press: \(settings.longPressDuration, format: .number.precision(.fractionLength(2))) s")
@@ -40,7 +41,7 @@ struct SettingsScreen: View {
                 } header: {
                     Text("Gameplay")
                 } footer: {
-                    Text("The lock button stops taps on the board so you can scroll big boards safely. Long press is how long to hold a cell to flag it (or to dig it in flag mode).")
+                    Text("The lock button stops taps on the board so you can scroll big boards safely. The hint button lights up the numbers that settle your next move; games played with it on keep their own stats. Long press is how long to hold a cell to flag it (or to dig it in flag mode).")
                 }
 
                 Section {
@@ -100,6 +101,30 @@ struct SettingsScreen: View {
                             }
                         }
                     }
+                }
+            }
+            if let last = settings.recentCustomBoards.first {
+                let isCurrent = last.matches(current)
+                Button {
+                    if !isCurrent { flow.requestNewGame(last.difficulty) }
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(isCurrent ? "Current Custom Board" : "Last Custom Board")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        CustomBoardLabel(board: last, isCurrent: isCurrent)
+                    }
+                }
+                .tint(.primary)
+            }
+            if settings.recentCustomBoards.count > 1 {
+                NavigationLink("Recent") {
+                    CustomBoardsScreen(kind: .recent) { dismiss() }
+                }
+            }
+            if !settings.favoriteCustomBoards.isEmpty {
+                NavigationLink("Favourites") {
+                    CustomBoardsScreen(kind: .favorites) { dismiss() }
                 }
             }
             NavigationLink("Custom…") {

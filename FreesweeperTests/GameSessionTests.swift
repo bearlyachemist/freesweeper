@@ -160,6 +160,44 @@ struct GameSessionTests {
         #expect(h.stats.modes.isEmpty)
     }
 
+    // MARK: Hints
+
+    @Test func hintHighlightsTheNumberAndClearsOnTheNextMove() {
+        let h = Harness.started { $0.showHintButton = true }
+        h.session.toggleHint()
+        // The corner 1 holds the only mine, so the count settles everything else.
+        #expect(h.session.hint == HintHighlight(numbers: [cornerNumber], usesMineCount: true))
+        h.session.toggleHint()
+        #expect(h.session.hint == nil, "Tapping again hides it")
+        h.session.toggleHint()
+        h.session.longPress(Coord(x: 5, y: 5))
+        #expect(h.session.hint == nil)
+    }
+
+    @Test func aGuessOffersAMineToFlag() {
+        var game = Game(board: Board(width: 8, height: 8, mines: [Coord(x: 0, y: 0), Coord(x: 7, y: 7)]))
+        game.reveal(cornerNumber)
+        let h = Harness(saved: SavedGame(game: game, elapsedSeconds: 1, noGuessLogic: nil)) { $0.showHintButton = true }
+        h.session.toggleHint()
+        #expect(h.session.hint == nil)
+        #expect(h.session.guessMine == Coord(x: 0, y: 0))
+        h.session.flagGuessMine()
+        #expect(h.session.guessMine == nil)
+        #expect(h.session.game.board[Coord(x: 0, y: 0)].state == .flagged)
+    }
+
+    @Test func hintsModeSticksOnceAMoveIsMadeWithTheButtonOn() {
+        let h = Harness.started()
+        #expect(!h.session.statsMode.hints)
+        h.settings.showHintButton = true
+        #expect(h.session.statsMode.hints)
+        h.session.longPress(Coord(x: 5, y: 5))
+        h.settings.showHintButton = false
+        #expect(h.session.statsMode.hints, "Turning it off mid-game doesn't undo it")
+        h.session.newGame(h.settings.difficulty)
+        #expect(!h.session.statsMode.hints)
+    }
+
     // MARK: No Guessing
 
     @Test func modeFollowsTheSwitchUntilTheFirstDig() {

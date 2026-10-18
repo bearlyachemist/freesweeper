@@ -6,26 +6,30 @@ struct LEDCounter: View {
     let digits: Int
     let colors: ClassicColors
 
+    @Environment(\.compactHeader) private var compact
+
     private static let digit = CGSize(width: 15, height: 27)
+    private static let compactDigit = CGSize(width: 12, height: 22)
     private static let spacing: CGFloat = 2
 
     var body: some View {
         let colors = colors
         let characters = Self.characters(for: value, digits: digits)
+        let digit = compact ? Self.compactDigit : Self.digit
         Canvas { context, _ in
             for (i, character) in characters.enumerated() {
                 let rect = CGRect(
-                    x: CGFloat(i) * (Self.digit.width + Self.spacing),
+                    x: CGFloat(i) * (digit.width + Self.spacing),
                     y: 0,
-                    width: Self.digit.width,
-                    height: Self.digit.height
+                    width: digit.width,
+                    height: digit.height
                 )
                 SevenSegment.draw(character, in: rect, on: colors.ledOn, off: colors.ledOff, context: context)
             }
         }
         .frame(
-            width: Self.digit.width * CGFloat(digits) + Self.spacing * CGFloat(digits - 1),
-            height: Self.digit.height
+            width: digit.width * CGFloat(digits) + Self.spacing * CGFloat(digits - 1),
+            height: digit.height
         )
         .padding(3)
         .background(colors.ledBackground)

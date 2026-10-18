@@ -1,19 +1,22 @@
 import Foundation
 import SweeperKit
 
-/// A mode for stats: board size, mine count and the logic a no-guess board was built for.
+/// A mode for stats: board size, mine count, the logic a no-guess board was built for, and
+/// whether hints were on.
 struct StatsMode: Hashable, Codable {
     let width: Int
     let height: Int
     let mines: Int
     /// `nil` for an ordinary random board.
     let noGuessing: NoGuessLogic?
+    let hints: Bool
 
-    init(difficulty: Difficulty, noGuessing: NoGuessLogic?) {
+    init(difficulty: Difficulty, noGuessing: NoGuessLogic?, hints: Bool = false) {
         width = difficulty.width
         height = difficulty.height
         mines = difficulty.mines
         self.noGuessing = noGuessing
+        self.hints = hints
     }
 
     /// Hard keeps the key No Guessing had before Easy existed, so those stats carry over.
@@ -24,11 +27,11 @@ struct StatsMode: Hashable, Codable {
         case .medium: "-noguess-medium"
         case .hard: "-noguess"
         }
-        return "\(width)x\(height)x\(mines)" + suffix
+        return "\(width)x\(height)x\(mines)" + suffix + (hints ? "-hints" : "")
     }
 
     var name: String {
-        [boardName, noGuessingName].compactMap(\.self).joined(separator: " · ")
+        [boardName, noGuessingName, hints ? "Hints" : nil].compactMap(\.self).joined(separator: " · ")
     }
 
     /// The board part of `name`, e.g. "Small Square · Easy".

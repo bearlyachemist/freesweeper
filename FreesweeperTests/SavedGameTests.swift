@@ -7,12 +7,13 @@ struct SavedGameTests {
     @Test func roundTripsAnUnfinishedGame() throws {
         let defaults = makeDefaults()
         let game = startedCornerMineGame()
-        SavedGame(game: game, elapsedSeconds: 33.3, noGuessLogic: .easy).save(to: defaults)
+        SavedGame(game: game, elapsedSeconds: 33.3, noGuessLogic: .easy, hints: true).save(to: defaults)
 
         let loaded = try #require(SavedGame.load(from: defaults))
         #expect(loaded.game.board == game.board)
         #expect(loaded.elapsedSeconds == 33.3)
         #expect(loaded.noGuessLogic == .easy)
+        #expect(loaded.hints)
     }
 
     @Test func oldNoGuessSavesLoadAsHard() throws {

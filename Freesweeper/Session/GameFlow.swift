@@ -68,6 +68,7 @@ final class GameFlow {
     private func startNewGame(_ difficulty: Difficulty?) {
         let difficulty = difficulty ?? settings.difficulty
         settings.difficulty = difficulty
+        if difficulty.isCustom { settings.noteCustomBoard(difficulty) }
         resultTask?.cancel()
         presentedResult = nil
         noGuessUnavailable = false

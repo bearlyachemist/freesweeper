@@ -38,6 +38,44 @@ struct AppSettingsTests {
         #expect(reloaded.difficulty == Difficulty(shape: .rectangle, size: .large, level: .hard))
     }
 
+    @Test func recentCustomBoardsAreNewestFirstWithoutRepeats() {
+        let defaults = makeDefaults()
+        let settings = AppSettings(defaults: defaults)
+        let a = Difficulty.custom(width: 30, height: 30, mines: 150)
+        let b = Difficulty.custom(width: 20, height: 40, mines: 100)
+        settings.noteCustomBoard(a)
+        settings.noteCustomBoard(b)
+        settings.noteCustomBoard(a)
+        #expect(settings.recentCustomBoards.map(\.difficulty) == [a, b])
+        #expect(AppSettings(defaults: defaults).recentCustomBoards.map(\.difficulty) == [a, b])
+    }
+
+    @Test func customBoardListsAreCapped() {
+        let settings = AppSettings(defaults: makeDefaults())
+        for mines in 1...60 { settings.noteCustomBoard(.custom(width: 30, height: 30, mines: mines)) }
+        #expect(settings.recentCustomBoards.count == AppSettings.customBoardLimit)
+        #expect(settings.recentCustomBoards.first?.mines == 60)
+        for mines in 1...50 { #expect(settings.toggleFavorite(.custom(width: 30, height: 30, mines: mines))) }
+        #expect(!settings.toggleFavorite(.custom(width: 30, height: 30, mines: 51)), "Full")
+        #expect(settings.toggleFavorite(.custom(width: 30, height: 30, mines: 1)), "Removing still works")
+        #expect(!settings.isFavorite(.custom(width: 30, height: 30, mines: 1)))
+    }
+
+    @Test func aCustomBoardFromBeforeRecentsStartsTheList() {
+        let defaults = makeDefaults()
+        AppSettings(defaults: defaults).difficulty = .custom(width: 30, height: 30, mines: 150)
+        #expect(AppSettings(defaults: defaults).recentCustomBoards.map(\.mines) == [150])
+    }
+
+    @Test func favouritesSortBySizeMinesOrDate() {
+        let now = Date.now
+        let small = CustomBoard(.custom(width: 10, height: 10, mines: 30), added: now)
+        let big = CustomBoard(.custom(width: 40, height: 40, mines: 20), added: now - 60)
+        #expect(FavoriteSort.size.sorted([big, small]) == [small, big])
+        #expect(FavoriteSort.mines.sorted([small, big]) == [big, small])
+        #expect(FavoriteSort.dateAdded.sorted([big, small]) == [small, big])
+    }
+
     @Test func oldNoGuessingSwitchBecomesHard() {
         let defaults = makeDefaults()
         defaults.set(true, forKey: "noGuessing")

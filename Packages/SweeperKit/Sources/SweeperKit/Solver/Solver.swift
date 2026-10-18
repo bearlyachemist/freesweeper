@@ -50,6 +50,8 @@ enum Solver {
         var cells: [Int]
         /// Mines among them.
         var mines: Int
+        /// The revealed cell whose number this is.
+        var source = -1
     }
 
     /// Backtracking steps allowed per call. A region that needs more is treated as undecided,
@@ -99,7 +101,7 @@ enum Solver {
                 }
             }
             if !unknown.isEmpty {
-                constraints.append(Constraint(cells: unknown, mines: Int(value) - knownMines))
+                constraints.append(Constraint(cells: unknown, mines: Int(value) - knownMines, source: cell))
             }
         }
         return constraints
@@ -154,22 +156,36 @@ enum Solver {
     /// Counting only the whole board, rather than the board minus some chosen numbers, keeps
     /// this order-independent: whatever order a player clears in, it stays available.
     static func counting(_ knowledge: Knowledge, constraints: [Constraint]) -> Deductions {
+        var result = Deductions()
+        for explanation in countingExplained(knowledge, constraints: constraints) {
+            if explanation.isMine { result.mines.insert(explanation.cell) } else { result.safe.insert(explanation.cell) }
+        }
+        return result
+    }
+
+    /// `counting`, keeping which number (if any) each cell came from.
+    static func countingExplained(_ knowledge: Knowledge, constraints: [Constraint]) -> [Explanation] {
         let unknown = Set(knowledge.cells.indices.filter { knowledge.cells[$0] == Knowledge.unknown })
         let remaining = knowledge.totalMines - knowledge.cells.count { $0 == Knowledge.mine }
-        guard !unknown.isEmpty, (0...unknown.count).contains(remaining) else { return Deductions() }
+        guard !unknown.isEmpty, (0...unknown.count).contains(remaining) else { return [] }
 
-        var result = Deductions()
-        if remaining == 0 { result.safe = unknown }
-        if remaining == unknown.count { result.mines = unknown }
+        var result: [Explanation] = []
+        func add(_ cells: Set<Int>, isMine: Bool, source: Int?) {
+            result += cells.map {
+                Explanation(cell: $0, isMine: isMine, sources: source.map { [$0] } ?? [], usesMineCount: true)
+            }
+        }
+        if remaining == 0 { add(unknown, isMine: false, source: nil) }
+        if remaining == unknown.count { add(unknown, isMine: true, source: nil) }
         // Every number's unknown cells lie inside `unknown`, so the pair rule from `pairs` reads:
         for constraint in constraints {
-            let outside = unknown.count - constraint.cells.count
+            let outside = unknown.subtracting(constraint.cells)
             if constraint.mines == remaining {
                 // This number holds every mine left; nothing else can be one.
-                result.safe.formUnion(unknown.subtracting(constraint.cells))
-            } else if remaining - constraint.mines == outside {
+                add(outside, isMine: false, source: constraint.source)
+            } else if remaining - constraint.mines == outside.count {
                 // Every cell this number doesn't touch is needed to reach the count.
-                result.mines.formUnion(unknown.subtracting(constraint.cells))
+                add(outside, isMine: true, source: constraint.source)
             }
         }
         return result
@@ -194,7 +210,13 @@ enum Solver {
         }
     }
 
-    static func regions(_ knowledge: Knowledge, grid: Grid, constraints: [Constraint]) -> Deductions {
+    /// `useMineCount: false` decides only what each region's numbers settle on their own.
+    static func regions(
+        _ knowledge: Knowledge,
+        grid: Grid,
+        constraints: [Constraint],
+        useMineCount: Bool = true
+    ) -> Deductions {
         // Number the frontier cells and union constraints that share a cell into regions.
         var frontierID: [Int: Int] = [:]
         var frontier: [Int] = []
@@ -268,7 +290,7 @@ enum Solver {
         for (k, region) in regions.enumerated() {
             guard let arrangements = region.arrangements else { continue }
             // A count is feasible if the rest of the board can absorb the remaining mines.
-            let feasible = arrangements.keys.filter { count in
+            let feasible = !useMineCount ? Array(arrangements.keys) : arrangements.keys.filter { count in
                 othersCanTotal(excluding: k, remaining - count - interior, remaining - count)
             }
             guard !feasible.isEmpty else { continue }
@@ -285,7 +307,7 @@ enum Solver {
         }
 
         // Unseen interior cells are decided only when the count leaves them no choice.
-        if interior > 0 {
+        if useMineCount, interior > 0 {
             let interiorCounts = (0...remaining)
                 .filter { prefix[regions.count][$0] }
                 .map { remaining - $0 }

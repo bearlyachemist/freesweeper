@@ -7,17 +7,20 @@ struct SavedGame: Codable {
     var elapsedSeconds: Double
     /// The logic the board was built for, or `nil` for an ordinary random board.
     var noGuessLogic: NoGuessLogic?
+    /// Whether the hint button was showing during the game.
+    var hints: Bool
 
     private static let key = "savedGame"
 
-    init(game: Game, elapsedSeconds: Double, noGuessLogic: NoGuessLogic?) {
+    init(game: Game, elapsedSeconds: Double, noGuessLogic: NoGuessLogic?, hints: Bool = false) {
         self.game = game
         self.elapsedSeconds = elapsedSeconds
         self.noGuessLogic = noGuessLogic
+        self.hints = hints
     }
 
     private enum CodingKeys: String, CodingKey {
-        case game, elapsedSeconds, noGuessLogic
+        case game, elapsedSeconds, noGuessLogic, hints
         /// Saves from before Easy existed; those no-guess boards were Hard.
         case isNoGuessBoard
     }
@@ -28,6 +31,7 @@ struct SavedGame: Codable {
         elapsedSeconds = try container.decode(Double.self, forKey: .elapsedSeconds)
         let legacy = try container.decodeIfPresent(Bool.self, forKey: .isNoGuessBoard) ?? false
         noGuessLogic = try container.decodeIfPresent(NoGuessLogic.self, forKey: .noGuessLogic) ?? (legacy ? .hard : nil)
+        hints = try container.decodeIfPresent(Bool.self, forKey: .hints) ?? false
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -35,6 +39,7 @@ struct SavedGame: Codable {
         try container.encode(game, forKey: .game)
         try container.encode(elapsedSeconds, forKey: .elapsedSeconds)
         try container.encodeIfPresent(noGuessLogic, forKey: .noGuessLogic)
+        try container.encode(hints, forKey: .hints)
     }
 
     /// The saved game if it's an unfinished, intact game; anything else is discarded.

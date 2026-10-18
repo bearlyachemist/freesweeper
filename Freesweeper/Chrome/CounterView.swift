@@ -8,6 +8,7 @@ struct CounterView: View {
     let systemImage: String
 
     @Environment(\.theme) private var theme
+    @Environment(\.compactHeader) private var compact
 
     var body: some View {
         switch theme.chrome {
@@ -15,15 +16,17 @@ struct CounterView: View {
             LEDCounter(value: value, digits: digits, colors: colors)
         case .modern:
             HStack(spacing: 5) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.palette.ink.opacity(0.55))
+                if !compact {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.palette.ink.opacity(0.55))
+                }
                 Text("\(value)")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(.system(size: compact ? 17 : 20, weight: .semibold, design: .rounded).monospacedDigit())
                     .contentTransition(.numericText())
                     .foregroundStyle(theme.palette.ink)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, compact ? 8 : 12)
             .frame(height: 36)
             .background(theme.palette.buttonFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }

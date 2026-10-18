@@ -1,6 +1,9 @@
 import SweeperKit
 
 extension Difficulty {
+    /// Not one of the shape × size × level presets.
+    var isCustom: Bool { shape == nil || level == nil }
+
     var summary: String { "\(width) × \(height) · \(mines) \(mines == 1 ? "mine" : "mines")" }
 
     /// Short name of the current mode for the header, e.g. "X-Large Rectangle · Hard".
