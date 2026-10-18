@@ -26,11 +26,16 @@ struct StatsSection: View {
             Button("Reset Stats for This Mode", role: .destructive) { isConfirmingReset = true }
                 .disabled(mode.played == 0)
         } header: {
-            // No Guessing gets its own line rather than wrapping mid-name.
+            // A bold title with the mode as a grey subtitle under it.
             VStack(alignment: .leading, spacing: 2) {
-                Text("Stats · \(self.mode.boardName)")
-                if let noGuessing = self.mode.noGuessingName { Text(noGuessing) }
+                Text("Stats")
+                    .font(.headline)
+                    .foregroundStyle(Color.primary)
+                Text(self.mode.name)
+                    .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .textCase(nil)
         }
         .confirmationDialog(
             "Reset stats for \(self.mode.name)?",
