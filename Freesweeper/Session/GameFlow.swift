@@ -25,8 +25,8 @@ final class GameFlow {
         session: GameSession,
         settings: AppSettings,
         stats: StatsStore,
-        winDelay: Duration = .milliseconds(500),
-        lossDelay: Duration = .milliseconds(900)
+        winDelay: Duration = .milliseconds(400),
+        lossDelay: Duration = .milliseconds(400)
     ) {
         self.session = session
         self.settings = settings
